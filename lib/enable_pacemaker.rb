@@ -1,0 +1,2 @@
+class EnablePacemaker
+end
