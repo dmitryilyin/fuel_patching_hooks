@@ -1,7 +1,7 @@
 require File.join(File.dirname(__FILE__), 'common/base')
 require File.join(File.dirname(__FILE__), 'common/pacemaker')
 
-class DisablePacemaker
+class DisablResources
   include Base
   include Pacemaker
 
@@ -16,6 +16,6 @@ class DisablePacemaker
 end
 
 if __FILE__ == $0
-  stop_services = DisablePacemaker.new
+  stop_services = DisablResources.new
   stop_services.execute
 end

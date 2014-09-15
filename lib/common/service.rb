@@ -1,5 +1,4 @@
 module Service
-  attr_accessor :stop_services_regexp
 
   # get service status from shell command
   # @return String
@@ -7,44 +6,76 @@ module Service
     `service --status-all 2>&1`
   end
 
-  # same as services_to_stop but reset mnemoization
-  # @return Array[String]
-  def services_to_stop_with_renew
-    @services_to_stop = nil
-    services_to_stop
+  # same as services_list but resets mnemoization
+  # @return [Hash<String => Symbol>]
+  def services_list_with_renew
+    @services_list = nil
+    services_list
   end
 
-  # find running services that should be stopped
-  # uses service status and regex to filter
-  # @return [Array<String>]
-  def services_to_stop
-    return @services_to_stop if @services_to_stop
-    @services_to_stop = services.split("\n").inject([]) do |services_to_stop, service|
+  # parse services into servicer list
+  # @return [Hash<String => Symbol>]
+  def services_list
+    return @services_list if @services_list
+    @services_list = {}
+    services.split("\n").each do |service|
       fields = service.chomp.split
-      running = if fields[4] == 'running...'
-                  fields[0]
-                elsif fields[1] == '+'
-                  fields[3]
-                else
-                  nil
-                end
-
-      if running =~ stop_services_regexp
-        # replace wrong service name
-        running = 'httpd' if running == 'httpd.event' and osfamily == 'RedHat'
-        running = 'openstack-keystone' if running == 'keystone' and osfamily == 'RedHat'
-        services_to_stop << running
-      else
-        services_to_stop
+      case
+        when fields[4] == 'running...'
+          name = fields[0]
+          status = :running
+        when fields[1] == '+'
+          name = fields[3]
+          status = :running
+        when fields[2] == 'stopped'
+          name = fields[0]
+          status = :stopped
+        when (fields[1] == '-' or fields[1] == '?')
+          name = fields[3]
+          status = :stopped
+        else
+          name = nil
+          status = nil
       end
+
+      if name
+        # replace wrong service name
+        name = 'httpd' if name == 'httpd.event' and osfamily == 'RedHat'
+        name = 'openstack-keystone' if name == 'keystone' and osfamily == 'RedHat'
+        @services_list.store name, status
+      end
+    end
+    @services_list
+  end
+
+  # find services matching regular expression
+  # @param regexp <Regexp>
+  # @return [Hash<String => Symbol>]
+  def services_by_regexp(regexp)
+    matched = {}
+    services_list.each do |name, status|
+      matched.store name, status if name =~ regexp
+    end
+    matched
+  end
+
+  # stop services that match regex
+  # @param regexp <Regexp>
+  def stop_services_by_regexp(regexp)
+    services_by_regexp(regexp).each do |name, status|
+      next unless status == :running
+      log "Try to stop service: #{name}"
+      run "service #{name} stop"
     end
   end
 
-  # stop services that match stop_services_regex
-  def stop_services
-    services_to_stop.each do |service|
-      log "Try to stop service: #{service}"
-      run "service #{service} stop"
+  # start services that match regex
+  # @param regexp <Regexp>
+  def start_services_by_regexp(regexp)
+    services_by_regexp(regexp).each do |name, status|
+      next unless status == :stopped
+      log "Try to start service: #{name}"
+      run "service #{name} start"
     end
   end
 

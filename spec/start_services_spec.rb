@@ -1,7 +1,7 @@
 require 'spec_helper'
-require File.join(File.dirname(__FILE__), '../lib/stop_services')
+require File.join(File.dirname(__FILE__), '../lib/start_services')
 
-describe StopServices do
+describe StartServices do
 
   let(:redhat_ps) do
     <<-eos
@@ -9,8 +9,6 @@ describe StopServices do
 101 100 /usr/bin/python nova-api.py
 102 100 /usr/bin/python nova-api.py
 103 100 /usr/bin/python nova-api.py
-104 1 /usr/bin/python cinder-volume.py
-105 104 /usr/sbin/tgtd
 106 1 /usr/bin/python neutron.py
 107 106 /usr/sbin/dnsmasq
 108 1 /usr/sbin/httpd
@@ -20,18 +18,6 @@ describe StopServices do
 
   let(:debian_pstree) do
     {
-        104 => {
-            :children => [105],
-            :ppid => 1,
-            :cmd => "/usr/bin/python cinder-volume.py",
-            :pid => 104
-        },
-        105 => {
-            :children => [],
-            :ppid => 104,
-            :cmd => "/usr/sbin/tgtd",
-            :pid => 105
-        },
         100 => {
             :children => [101, 102, 103],
             :ppid => 1,
@@ -39,7 +25,7 @@ describe StopServices do
             :pid => 100
         },
         1 => {
-            :children => [100, 104, 106, 108, 109]
+            :children => [100, 106, 108, 109]
         },
         106 => {
             :children => [107],
@@ -88,18 +74,6 @@ describe StopServices do
 
   let(:redhat_pstree) do
     {
-        104 => {
-            :children => [105],
-            :ppid => 1,
-            :cmd => "/usr/bin/python cinder-volume.py",
-            :pid => 104
-        },
-        105 => {
-            :children => [],
-            :ppid => 104,
-            :cmd => "/usr/sbin/tgtd",
-            :pid => 105
-        },
         100 => {
             :children => [101, 102, 103],
             :ppid => 1,
@@ -107,7 +81,7 @@ describe StopServices do
             :pid => 100
         },
         1 => {
-            :children => [100, 104, 106, 108, 109]
+            :children => [100, 106, 108, 109]
         },
         106 => {
             :children => [107],
@@ -160,8 +134,6 @@ describe StopServices do
 101 100 /usr/bin/python nova-api.py
 102 100 /usr/bin/python nova-api.py
 103 100 /usr/bin/python nova-api.py
-104 1 /usr/bin/python cinder-volume.py
-105 104 /usr/sbin/tgtd
 106 1 /usr/bin/python neutron.py
 107 106 /usr/sbin/dnsmasq
 108 1 /usr/sbin/apache2
@@ -173,7 +145,7 @@ describe StopServices do
     <<-eos
  [ ? ]  ntpd
  [ ? ]  neutron
- [ + ]  cinder-volume
+ [ - ]  cinder-volume
  [ - ]  nginx
  [ - ]  smbd
  [ + ]  sshd
@@ -188,7 +160,7 @@ describe StopServices do
 ntpd is stopped
 neutron is stopped
 sshd (pid  50) is running...
-openstack-cinder-volume (pid  104) is running...
+openstack-cinder-volume is stopped
 openstack-nova-api (pid  100) is running...
 nginx is stopped
 smbd is stopped
@@ -201,7 +173,7 @@ keystone (pid  109) is running...
     {
         'ntpd' => :stopped,
         'neutron' => :stopped,
-        'cinder-volume' => :running,
+        'cinder-volume' => :stopped,
         'nginx' => :stopped,
         'smbd' => :stopped,
         'sshd' => :running,
@@ -215,7 +187,7 @@ keystone (pid  109) is running...
     {
         'ntpd' => :stopped,
         'neutron' => :stopped,
-        'openstack-cinder-volume' => :running,
+        'openstack-cinder-volume' => :stopped,
         'nginx' => :stopped,
         'smbd' => :stopped,
         'sshd' => :running,
@@ -244,22 +216,6 @@ keystone (pid  109) is running...
       @class.stubs(:services).returns debian_services
     end
 
-    it 'should correctly parse ps output' do
-      @class.process_tree_with_renew
-      expect(@class.process_tree).to eq debian_pstree
-    end
-
-    it 'should find processes by regexp' do
-      @class.process_tree_with_renew
-      dnsmasq = {107 => {
-          :children => [],
-          :ppid => 106,
-          :cmd => '/usr/sbin/dnsmasq',
-          :pid => 107
-      }}
-      expect(@class.pids_by_regexp /dnsmasq/).to eq dnsmasq
-    end
-
     it 'should find all services' do
       expect(@class.services_list_with_renew).to eq debian_services_list
     end
@@ -269,19 +225,11 @@ keystone (pid  109) is running...
       expect(@class.services_by_regexp /nginx/).to eq({'nginx' => :stopped})
     end
 
-    it 'should kill correct processes' do
-      @class.expects(:run).with 'kill -9 100 101 102 103 104 105 106 107 108 109'
-      @class.process_tree_with_renew
-      @class.kill_pids_by_regexp services_regexp
-    end
-
-    it 'should stop correct services' do
-      @class.expects(:run).with 'service cinder-volume stop'
-      @class.expects(:run).with 'service nova-api stop'
-      @class.expects(:run).with 'service apache2 stop'
-      @class.expects(:run).with 'service keystone stop'
+    it 'should start correct services' do
+      @class.expects(:run).with 'service cinder-volume start'
+      @class.expects(:run).with 'service neutron start'
       @class.services_list_with_renew
-      @class.stop_services_by_regexp services_regexp
+      @class.start_services_by_regexp services_regexp
     end
   end
 
@@ -292,23 +240,7 @@ keystone (pid  109) is running...
       @class.stubs(:services).returns redhat_services
     end
 
-    it 'should correctly parse ps output' do
-      @class.process_tree_with_renew
-      expect(@class.process_tree).to eq redhat_pstree
-    end
-
-    it 'should find processes by regexp' do
-      @class.process_tree_with_renew
-      dnsmasq = {107 => {
-          :children => [],
-          :ppid => 106,
-          :cmd => '/usr/sbin/dnsmasq',
-          :pid => 107
-      }}
-      expect(@class.pids_by_regexp /dnsmasq/).to eq dnsmasq
-    end
-
-    it 'should find all services' do
+    it 'should find services' do
       expect(@class.services_list_with_renew).to eq redhat_services_list
     end
 
@@ -317,19 +249,11 @@ keystone (pid  109) is running...
       expect(@class.services_by_regexp /nginx/).to eq({'nginx' => :stopped})
     end
 
-    it 'should kill correct processes' do
-      @class.expects(:run).with 'kill -9 100 101 102 103 104 105 106 107 108 109'
-      @class.process_tree_with_renew
-      @class.kill_pids_by_regexp services_regexp
-    end
-
-    it 'should stop correct services' do
-      @class.expects(:run).with 'service openstack-cinder-volume stop'
-      @class.expects(:run).with 'service openstack-nova-api stop'
-      @class.expects(:run).with 'service httpd stop'
-      @class.expects(:run).with 'service openstack-keystone stop'
+    it 'should start correct services' do
+      @class.expects(:run).with 'service openstack-cinder-volume start'
+      @class.expects(:run).with 'service neutron start'
       @class.services_list_with_renew
-      @class.stop_services_by_regexp services_regexp
+      @class.start_services_by_regexp services_regexp
     end
   end
 

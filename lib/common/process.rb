@@ -84,8 +84,6 @@ module Process
     end
   end
 
-
-
   # filter pids which cmd match regexp
   # @param regexp <Regexp> Search pids by this regexp
   # @return [Hash<Integer => Hash<Symbol => String,Integer>>]
@@ -97,10 +95,11 @@ module Process
     matched
   end
 
-  # kill pids that match stop_services_regexp
+  # kill pids that match regexp
+  # @param regexp <Regexp>
   # @return <TrueClass,FalseClass>
-  def kill_pids_by_stop_regexp
-    pids = pids_by_regexp(@stop_services_regexp).keys
+  def kill_pids_by_regexp(regexp)
+    pids = pids_by_regexp(regexp).keys
     kill_pids pids
   end
 end
