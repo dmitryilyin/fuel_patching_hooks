@@ -11,7 +11,8 @@ class EnableResources
 
   # entry point
   def execute
-    manage_cluster
+    resources_regexp = %r{nova|cinder|glance|keystone|neutron|sahara|murano|ceilometer|heat|swift}
+    start_or_unban_by_regexp resources_regexp
   end
 end
 

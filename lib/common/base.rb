@@ -1,12 +1,54 @@
 require 'rubygems'
 require 'facter'
 require 'time'
+require 'yaml'
 
 module Base
   @osfamily = nil
   @dry_run = false
 
   attr_accessor :dry_run
+
+  # same as fuel_settings but resets mnemoization
+  # @return [Hash]
+  def fuel_settings_with_renew
+    @fuel_settings = nil
+    fuel_settings
+  end
+
+  def read_astute_yaml
+    settings_file = '/etc/astute.yaml'
+    begin
+      File.read settings_file
+    rescue
+      nil
+    end
+  end
+
+  # get astute.yaml settings
+  # @return [Hash]
+  def fuel_settings
+    return @fuel_settings if @fuel_settings
+    begin
+      @fuel_settings = YAML.load read_astute_yaml
+    rescue
+      @fuel_settings = nil
+    end
+    @fuel_settings
+  end
+
+  def cluster_nodes_count
+    return nil unless fuel_settings.is_a? Hash and fuel_settings.key? 'nodes'
+    nodes = fuel_settings['nodes']
+    return nil unless nodes.is_a? Array
+    nodes.inject(0) do |controllers, node|
+      if node['role'] =~ /controller/
+        controllers + 1
+      else
+       controllers
+      end
+    end
+  end
 
   # get osfamily from facter
   # @return [String]

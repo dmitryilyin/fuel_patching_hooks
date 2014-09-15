@@ -127,6 +127,22 @@ module Pacemaker
     run "crm reource unmanage '#{value}'"
   end
 
+  def stop_or_ban_by_regexp(regexp)
+    if not cluster_nodes_count or cluster_nodes_count == 1
+      stop_resources_by_regexp regexp
+    else
+      ban_resources_by_regexp regexp
+    end
+  end
+
+  def start_or_unban_by_regexp(regexp)
+    if not cluster_nodes_count or cluster_nodes_count == 1
+      start_resources_by_regexp regexp
+    else
+      unban_resources_by_regexp regexp
+    end
+  end
+
   def manage_cluster
     maintenance_mode true
   end

@@ -1,13 +1,11 @@
 #!/usr/bin/env ruby
 require File.join(File.dirname(__FILE__), 'common/base')
 require File.join(File.dirname(__FILE__), 'common/service')
-require File.join(File.dirname(__FILE__), 'common/process')
 
 # pre-deploy hook library
 class StartServices
   include Base
   include Service
-  include Process
 
   # entry point
   def execute

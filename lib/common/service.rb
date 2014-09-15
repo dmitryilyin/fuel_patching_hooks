@@ -24,15 +24,18 @@ module Service
         when fields[4] == 'running...'
           name = fields[0]
           status = :running
-        when fields[1] == '+'
-          name = fields[3]
-          status = :running
         when fields[2] == 'stopped'
           name = fields[0]
           status = :stopped
-        when (fields[1] == '-' or fields[1] == '?')
+        when fields[1] == '+'
+          name = fields[3]
+          status = :running
+        when fields[1] == '-'
           name = fields[3]
           status = :stopped
+        when fields[1] == '?'
+          name = fields[3]
+          status = :unknown
         else
           name = nil
           status = nil
@@ -63,7 +66,7 @@ module Service
   # @param regexp <Regexp>
   def stop_services_by_regexp(regexp)
     services_by_regexp(regexp).each do |name, status|
-      next unless status == :running
+      next if status == :stopped
       log "Try to stop service: #{name}"
       run "service #{name} stop"
     end
@@ -73,7 +76,7 @@ module Service
   # @param regexp <Regexp>
   def start_services_by_regexp(regexp)
     services_by_regexp(regexp).each do |name, status|
-      next unless status == :stopped
+      next if status == :running
       log "Try to start service: #{name}"
       run "service #{name} start"
     end
