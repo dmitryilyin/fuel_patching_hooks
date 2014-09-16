@@ -242,6 +242,7 @@ eos
     @class = subject
     @class.stubs(:raw_cib).returns raw_cib
     @class.dry_run = true
+    @class.stubs(:log).returns true
   end
 
   it 'can obtain a CIB XML object' do
