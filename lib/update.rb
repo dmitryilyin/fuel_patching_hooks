@@ -14,7 +14,7 @@ class Update
   def execute
     services = %r{nova|cinder|glance|keystone|neutron|sahara|murano|ceilometer|heat|swift|apache2|httpd}
     #TODO make package lists for ubuntu and centos
-    packages = %w(
+    deb_packages = %w(
 heat-api
 heat-api-cfn
 heat-api-cloudwatch
@@ -23,6 +23,26 @@ heat-engine
 python-heat
 python-heatclient
     )
+    rpm_packages = %w(
+murano-apps
+murano-api
+murano-dashboard
+openstack-dashboard
+openstack-heat-engine
+openstack-heat-api
+openstack-heat-api
+openstack-heat-api
+openstack-heat-common
+python-heatclient
+    )
+
+    if osfamily == 'RedHat'
+      packages = rpm_packages
+    elsif osfamily == 'Debian'
+      packages = deb_packages
+    else
+      raise "Unknown osfamily: #{osfamily}"
+    end
 
     @dry_run = false
     if is_ha?
@@ -43,8 +63,7 @@ python-heatclient
       cleanup_resources_by_regexp services
       pcmk_status
     end
-    # cannot do this because it will start disabled services too
-    # start_services_by_regexp services
+    start_services_by_regexp services
 
     # TODO start non-ha services that are autostart? or run puppet? or start services that were stopped previously?
     # finding a way to start services without Puppet will allow to patch with this script only

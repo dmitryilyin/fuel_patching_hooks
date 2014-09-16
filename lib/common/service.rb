@@ -16,6 +16,51 @@ module Service
     services_list
   end
 
+  def service_is_enabled?(value)
+    #TODO may be incorrect for non-upstart init scripts
+    if osfamily == 'Debian'
+      init_folder = '/etc/init'
+      override_file = File.join init_folder, value.to_s + '.override'
+      return true unless File.exists? override_file
+      begin
+        override_text = File.read override_file
+        return false if override_text.include? 'manual'
+      rescue
+        true
+      end
+      true
+    elsif osfamily == 'RedHat'
+      out,code = run "chkconfig #{value}"
+      if code == 0
+        true
+      else
+        false
+      end
+    else
+      raise "Unknown osfamily: #{osfamily}"
+    end
+  end
+
+  def service_is_running?(value)
+    out,code = run "service #{value} status"
+    if osfamily == 'Debian'
+      if out.include? 'start/running'
+        true
+      else
+        false
+      end
+    elsif osfamily == 'RedHat'
+      if code == 0
+        true
+      else
+        false
+      end
+    else
+      raise "Unknown osfamily: #{osfamily}"
+    end
+  end
+
+
   # parse services into servicer list
   # @return [Hash<String => Symbol>]
   def services_list
@@ -67,9 +112,10 @@ module Service
 
   # stop services that match regex
   # @param regexp <Regexp>
-  def stop_services_by_regexp(regexp)
+  def stop_services_by_regexp(regexp, check_stopped = true, only_enabled = true)
     services_by_regexp(regexp).each do |name, status|
-      next if status == :stopped
+      next if status == :stopped if check_stopped
+      next unless service_is_enabled? name if only_enabled
       log "Try to stop service: #{name}"
       run "service #{name} stop"
     end
@@ -77,9 +123,9 @@ module Service
 
   # start services that match regex
   # @param regexp <Regexp>
-  def start_services_by_regexp(regexp)
+  def start_services_by_regexp(regexp, check_running = true)
     services_by_regexp(regexp).each do |name, status|
-      next if status == :running
+      next if status == :running if check_running
       log "Try to start service: #{name}"
       run "service #{name} start"
     end
