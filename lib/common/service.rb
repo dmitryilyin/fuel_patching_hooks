@@ -1,5 +1,8 @@
 module Service
 
+  #TODO start only services enabled on boot
+  #TODO record which services were stopped
+
   # get service status from shell command
   # @return String
   def services

@@ -2,14 +2,46 @@ require 'spec_helper'
 require File.join(File.dirname(__FILE__), '../lib/common/base')
 require File.join(File.dirname(__FILE__), '../lib/common/pacemaker')
 
+#TODO move some tests to base spec
+
 class PacemakerTest
   include Base
   include Pacemaker
 end
 
 describe PacemakerTest do
+  let(:fuel_settings_simple) do
+    <<-eos
+deployment_mode: multinode
+nodes:
+- uid: "1"
+  storage_address: 192.168.1.1
+  fqdn: node-1.domain.tld
+  storage_netmask: 255.255.255.0
+  role: controller
+  swift_zone: "1"
+  internal_address: 192.168.0.2
+  public_address: 172.16.0.3
+  name: node-1
+  public_netmask: 255.255.255.0
+  internal_netmask: 255.255.255.0
+- uid: "2"
+  storage_address: 192.168.1.2
+  fqdn: node-2.domain.tld
+  storage_netmask: 255.255.255.0
+  role: compute
+  swift_zone: "1"
+  internal_address: 192.168.0.3
+  public_address: 172.16.0.4
+  name: node-2
+  public_netmask: 255.255.255.0
+  internal_netmask: 255.255.255.0
+    eos
+  end
+
   let(:fuel_settings_single) do
 <<-eos
+deployment_mode: ha
 nodes:
 - uid: "1"
   storage_address: 192.168.1.1
@@ -38,6 +70,7 @@ eos
 
   let(:fuel_settings_multi) do
     <<-eos
+deployment_mode: ha
 nodes:
 - uid: "1"
   storage_address: 192.168.1.1

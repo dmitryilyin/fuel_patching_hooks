@@ -17,6 +17,6 @@ class EnableResources
 end
 
 if __FILE__ == $0
-  stop_services = EnableResources.new
-  stop_services.execute
+  me = EnableResources.new
+  me.execute
 end

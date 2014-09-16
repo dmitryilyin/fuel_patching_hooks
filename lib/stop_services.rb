@@ -19,6 +19,6 @@ class StopServices
 end # class
 
 if __FILE__ == $0
-  stop_services = StopServices.new
-  stop_services.execute
+  me = StopServices.new
+  me.execute
 end

@@ -16,6 +16,6 @@ class StartServices
 end # class
 
 if __FILE__ == $0
-  start_services = StartServices.new
-  start_services.execute
+  me = StartServices.new
+  me.execute
 end

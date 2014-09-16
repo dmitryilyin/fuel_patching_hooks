@@ -50,6 +50,17 @@ module Base
     end
   end
 
+  def is_ha?
+    return nil unless fuel_settings.is_a? Hash and fuel_settings.key? 'deployment_mode'
+    if %w(singlenode multinode).include? fuel_settings['deployment_mode']
+      false
+    elsif %w(ha ha_compact ha_full).include? fuel_settings['deployment_mode']
+      true
+    else
+      nil
+    end
+  end
+
   # get osfamily from facter
   # @return [String]
   def osfamily
@@ -76,7 +87,7 @@ module Base
   # @param msg [String]
   def log(msg)
      begin
-       log_file = '/tmp/update.log'
+       log_file = '/var/log/patching.log'
        open(log_file, 'a') do |file|
          file.puts Time.now.to_s + ': ' + msg
        end

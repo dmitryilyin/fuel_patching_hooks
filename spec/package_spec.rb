@@ -16,6 +16,7 @@ ipcalc|0.41-4|install ok installed
 iproute|3.12.0-2|install ok installed
 iptables|1.4.21-1ubuntu1|install ok installed
 ntpdate|4.2.6.p5+dfsg-3ubuntu2|install ok installed
+mc|3:4.8.11-1|install ok installed
 eos
   end
 
@@ -25,6 +26,7 @@ eos
         "iproute"=>"3.12.0-2",
         "ipcalc"=>"0.41-4",
         "ntpdate" =>"4.2.6.p5+dfsg-3ubuntu2",
+        "mc" => "3:4.8.11-1",
     }
   end
 
@@ -36,6 +38,7 @@ udev|147-2.51.el6
 device-mapper|1.02.79-8.el6
 openssh|5.3p1-94.el6
 ntpdate|4.2.6p5-1.el6
+mc|1:4.7.0.2-3.el6
 eos
   end
 
@@ -47,6 +50,7 @@ eos
         "udev"=>"147-2.51.el6",
         "device-mapper"=>"1.02.79-8.el6",
         "ntpdate"=>"4.2.6p5-1.el6",
+        "mc"=>"1:4.7.0.2-3.el6",
     }
   end
 
@@ -120,23 +124,23 @@ Remove        4 Package(s)                                                      
 
     it 'determines if a package is not installed' do
       @class.installed_packages_with_renew
-      expect(@class.is_installed? 'mc').to be_falsey
+      expect(@class.is_installed? 'firefox').to be_falsey
     end
 
     it 'filters out not installed packages' do
       @class.installed_packages_with_renew
-      expect(@class.filter_installed packages_to_remove).to eq %w(iproute ntpdate)
+      expect(@class.filter_installed packages_to_remove).to eq %w(iproute mc ntpdate)
     end
 
     it 'uninstalls only installed packages from the list' do
       @class.installed_packages_with_renew
-      @class.expects(:remove).with(%w(iproute ntpdate))
+      @class.expects(:remove).with(%w(iproute mc ntpdate))
       @class.uninstall_packages packages_to_remove
     end
 
-    it 'uses apt-get purge -y to remove packages' do
+    it 'uses apt-get remove -y to remove packages' do
       @class.installed_packages_with_renew
-      @class.expects(:run).with 'apt-get purge -y iproute ntpdate'
+      @class.expects(:run).with 'apt-get remove -y iproute ntpdate'
       @class.remove %w(iproute ntpdate)
     end
 
@@ -170,10 +174,18 @@ Remove        4 Package(s)                                                      
         @class.expects(:install).with deb_remove_list.keys
         @class.install_removed_packages
       end
+
+      it 'updates removing old packages first' do
+        @class.expects(:remove).with(%w(iproute mc ntpdate))
+        @class.stubs(:removed_packages).returns(deb_remove_list)
+        @class.expects(:install).with(%w(mc))
+        @class.update_removing_first packages_to_remove
+      end
     end
 
     it 'uses apt-get clean to reset repos' do
       @class.expects(:run).with 'apt-get clean'
+      @class.expects(:run).with 'apt-get update'
       @class.reset_repos
     end
 
@@ -197,17 +209,17 @@ Remove        4 Package(s)                                                      
 
     it 'determines if a package is not installed' do
       @class.installed_packages_with_renew
-      expect(@class.is_installed? 'mc').to be_falsey
+      expect(@class.is_installed? 'firefox').to be_falsey
     end
 
     it 'filters out not installed packages' do
       @class.installed_packages_with_renew
-      expect(@class.filter_installed packages_to_remove).to eq %w(iproute ntpdate)
+      expect(@class.filter_installed packages_to_remove).to eq %w(iproute mc ntpdate)
     end
 
     it 'uninstalls only installed packages from the list' do
       @class.installed_packages_with_renew
-      @class.expects(:remove).with(%w(iproute ntpdate))
+      @class.expects(:remove).with(%w(iproute mc ntpdate))
       @class.uninstall_packages packages_to_remove
     end
 
@@ -247,10 +259,18 @@ Remove        4 Package(s)                                                      
         @class.expects(:install).with rpm_remove_list.keys
         @class.install_removed_packages
       end
+
+      it 'updates removing old packages first' do
+        @class.expects(:remove).with(%w(iproute mc ntpdate))
+        @class.stubs(:removed_packages).returns(rpm_remove_list)
+        @class.expects(:install).with(%w(mc))
+        @class.update_removing_first packages_to_remove
+      end
     end
 
     it 'uses yum clean all to reset repos' do
       @class.expects(:run).with 'yum clean all'
+      @class.expects(:run).with 'yum makecache'
       @class.reset_repos
     end
 

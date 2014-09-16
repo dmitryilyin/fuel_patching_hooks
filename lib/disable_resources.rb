@@ -17,6 +17,6 @@ class DisableResources
 end
 
 if __FILE__ == $0
-  stop_services = DisableResources.new
-  stop_services.execute
+  me = DisableResources.new
+  me.execute
 end

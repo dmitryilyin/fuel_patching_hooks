@@ -2,6 +2,8 @@ require 'rexml/document'
 
 module Pacemaker
 
+  #TODO add resources status calculations
+
   @raw_cib = nil
   @cib = nil
   @resources = nil
@@ -116,15 +118,21 @@ module Pacemaker
   end
 
   def cleanup_resource(value)
-    run "crm reource cleanup '#{value}'"
+    run "crm resource cleanup '#{value}'"
   end
 
   def manage_resource(value)
-    run "crm reource manage '#{value}'"
+    run "crm resource manage '#{value}'"
   end
 
   def unmanage_resource(value)
-    run "crm reource unmanage '#{value}'"
+    run "crm resource unmanage '#{value}'"
+  end
+
+  def pcmk_status
+    sleep 2
+    run 'pcs status'
+    sleep 2
   end
 
   def stop_or_ban_by_regexp(regexp)
@@ -140,6 +148,12 @@ module Pacemaker
       start_resources_by_regexp regexp
     else
       unban_resources_by_regexp regexp
+    end
+  end
+
+  def cleanup_resources_by_regexp(regexp)
+    get_resources_names_by_regexp(regexp).each do |r|
+      cleanup_resource r
     end
   end
 
@@ -177,8 +191,4 @@ module Pacemaker
     run "cibadmin --patch --sync-call --xml-text '#{xml}'"
   end
 
-end
-
-class Test
-  include Pacemaker
 end

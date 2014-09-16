@@ -1,5 +1,4 @@
 module Package
-  @removed_packages = {}
 
   def get_rpm_packages
     `rpm -qa --queryformat '%{NAME}|%{VERSION}-%{RELEASE}\n'`
@@ -66,11 +65,12 @@ module Package
 
   def remove(packages)
     packages = Array packages
+    return true unless packages.any?
     if osfamily == 'RedHat'
       stdout, return_code = run "yum erase -y #{packages.join ' '}"
       parse_rpm_remove stdout
     elsif osfamily == 'Debian'
-      stdout, return_code = run "apt-get purge -y #{packages.join ' '}"
+      stdout, return_code = run "apt-get remove -y #{packages.join ' '}"
       parse_deb_remove stdout
     else
       raise "Unknown osfamily: #{osfamily}"
@@ -119,11 +119,13 @@ module Package
   end
 
   def removed_packages
+    @removed_packages = {} unless @removed_packages
     @removed_packages
   end
 
   def install(packages)
     packages = Array packages
+    return true unless packages.any?
     if osfamily == 'RedHat'
       run "yum install -y #{packages.join ' '}"
     elsif osfamily == 'Debian'
@@ -153,11 +155,18 @@ module Package
   def reset_repos
     if osfamily == 'RedHat'
       run 'yum clean all'
+      run 'yum makecache'
     elsif osfamily == 'Debian'
       run 'apt-get clean'
+      run 'apt-get update'
     else
       raise "Unknown osfamily: #{osfamily}"
     end
+  end
+
+  def update_removing_first(packages)
+    uninstall_packages packages
+    install_removed_packages packages
   end
 
 end

@@ -16,6 +16,6 @@ class DisablePacemaker
 end
 
 if __FILE__ == $0
-  stop_services = DisablePacemaker.new
-  stop_services.execute
+  me = DisablePacemaker.new
+  me.execute
 end
