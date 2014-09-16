@@ -54,12 +54,52 @@ eos
     %w(iproute mc firefox ntpdate)
   end
 
+  let(:deb_remove_out) do
+<<-eos
+(Reading database ... 463883 files and directories currently installed.)
+Removing mc (3:4.8.11-1) ...
+Purging configuration files for mc (3:4.8.11-1) ...
+Removing mc-data (3:4.8.11-1) ...
+eos
+  end
+
+  let(:key_packages) do
+    %w(mc firefox)
+  end
+
+  let(:deb_remove_list) do
+    {"mc-data"=>"3:4.8.11-1", "mc"=>"3:4.8.11-1"}
+  end
+
+  let(:rpm_remove_out) do
+    <<-eos
+Dependencies Resolved
+
+=======================================================================================================================================================================
+ Package                                Arch                                Version                                        Repository                             Size
+=======================================================================================================================================================================
+Removing:
+ htop                                   x86_64                              1.0.1-2.el6                                    @nailgun                              161 k
+ mc                                     x86_64                              1:4.7.0.2-3.el6                                @nailgun                              5.4 M
+ tmux                                   x86_64                              1.6-3.el6                                      @nailgun                              494 k
+ yum-utils                              noarch                              1.1.30-17.el6_5                                @nailgun                              302 k
+
+Transaction Summary
+=======================================================================================================================================================================
+Remove        4 Package(s)                                                                                                                        3/3
+    eos
+  end
+
+  let(:rpm_remove_list) do
+    {"htop"=>"1.0.1-2.el6", "tmux"=>"1.6-3.el6", "mc"=>"1:4.7.0.2-3.el6", "yum-utils"=>"1.1.30-17.el6_5"}
+  end
+
   ###########################
 
   before(:each) do
     @class = subject
     @class.dry_run = true
-    #@class.stubs(:log).returns true
+    @class.stubs(:log).returns true
   end
 
   context 'on Debian system' do
@@ -88,7 +128,7 @@ eos
       expect(@class.filter_installed packages_to_remove).to eq %w(iproute ntpdate)
     end
 
-    it 'uninstalls packages from the list' do
+    it 'uninstalls only installed packages from the list' do
       @class.installed_packages_with_renew
       @class.expects(:remove).with(%w(iproute ntpdate))
       @class.uninstall_packages packages_to_remove
@@ -98,6 +138,43 @@ eos
       @class.installed_packages_with_renew
       @class.expects(:run).with 'apt-get purge -y iproute ntpdate'
       @class.remove %w(iproute ntpdate)
+    end
+
+    it 'uses yum apt-get install -y to install packages' do
+      @class.installed_packages_with_renew
+      @class.expects(:run).with 'apt-get install -y iproute ntpdate'
+      @class.install %w(iproute ntpdate)
+    end
+
+    it 'parses deb remove output' do
+      @class.stubs(:run).returns [deb_remove_out, 0]
+      @class.remove %w('mc', 'mc-data')
+      expect(@class.removed_packages).to eq deb_remove_list
+    end
+
+    context 'on reinstall' do
+      it 'installs only those key packages that were removed' do
+        @class.stubs(:removed_packages).returns deb_remove_list
+        @class.expects(:install).with %w(mc)
+        @class.install_removed_packages key_packages
+      end
+
+      it 'installs all key packages in no removed present' do
+        @class.stubs(:removed_packages).returns({})
+        @class.expects(:install).with key_packages
+        @class.install_removed_packages key_packages
+      end
+
+      it 'installes all removed packages if no key packages present' do
+        @class.stubs(:removed_packages).returns deb_remove_list
+        @class.expects(:install).with deb_remove_list.keys
+        @class.install_removed_packages
+      end
+    end
+
+    it 'uses apt-get clean to reset repos' do
+      @class.expects(:run).with 'apt-get clean'
+      @class.reset_repos
     end
 
   end
@@ -128,17 +205,55 @@ eos
       expect(@class.filter_installed packages_to_remove).to eq %w(iproute ntpdate)
     end
 
-    it 'uninstalls packages from the list' do
+    it 'uninstalls only installed packages from the list' do
       @class.installed_packages_with_renew
       @class.expects(:remove).with(%w(iproute ntpdate))
       @class.uninstall_packages packages_to_remove
     end
 
-    it 'uses yum -y erase to remove packages' do
+    it 'uses yum erase -y to remove packages' do
       @class.installed_packages_with_renew
       @class.expects(:run).with 'yum erase -y iproute ntpdate'
       @class.remove %w(iproute ntpdate)
     end
+
+    it 'uses yum install -y to install packages' do
+      @class.installed_packages_with_renew
+      @class.expects(:run).with 'yum install -y iproute ntpdate'
+      @class.install %w(iproute ntpdate)
+    end
+
+    it 'parses rpm remove output' do
+      @class.stubs(:run).returns [rpm_remove_out, 0]
+      @class.remove %w('htop', 'tmux', mc', 'yum-utils')
+      expect(@class.removed_packages).to eq rpm_remove_list
+    end
+
+    context 'on reinstall' do
+      it 'installs only those key packages that were removed' do
+        @class.stubs(:removed_packages).returns rpm_remove_list
+        @class.expects(:install).with %w(mc)
+        @class.install_removed_packages key_packages
+      end
+
+      it 'installs all key packages in no removed present' do
+        @class.stubs(:removed_packages).returns({})
+        @class.expects(:install).with key_packages
+        @class.install_removed_packages key_packages
+      end
+
+      it 'installes all removed packages if no key packages present' do
+        @class.stubs(:removed_packages).returns rpm_remove_list
+        @class.expects(:install).with rpm_remove_list.keys
+        @class.install_removed_packages
+      end
+    end
+
+    it 'uses yum clean all to reset repos' do
+      @class.expects(:run).with 'yum clean all'
+      @class.reset_repos
+    end
+
   end
 
 end

@@ -1,4 +1,6 @@
 module Package
+  @removed_packages = {}
+
   def get_rpm_packages
     `rpm -qa --queryformat '%{NAME}|%{VERSION}-%{RELEASE}\n'`
   end
@@ -65,16 +67,97 @@ module Package
   def remove(packages)
     packages = Array packages
     if osfamily == 'RedHat'
-      run "yum erase -y #{packages.join ' '}"
+      stdout, return_code = run "yum erase -y #{packages.join ' '}"
+      parse_rpm_remove stdout
     elsif osfamily == 'Debian'
-      run "apt-get purge -y #{packages.join ' '}"
+      stdout, return_code = run "apt-get purge -y #{packages.join ' '}"
+      parse_deb_remove stdout
     else
       raise "Unknown osfamily: #{osfamily}"
     end
   end
 
+  def parse_deb_remove(stdout)
+    if not stdout or stdout == ''
+      @removed_packages = {}
+      return @removed_packages
+    end
+    @removed_packages = {}
+    stdout.split("\n").inject({}) do |removed, line|
+      if line =~ /^Removing\s+(\S+)\s+\((\S+?)\)\s+\.\.\./
+        @removed_packages.store $1, $2 if $1 and $2
+      end
+    end
+    @removed_packages
+  end
+
+  def parse_rpm_remove(stdout)
+    if not stdout or stdout == ''
+      @removed_packages = {}
+      return @removed_packages
+    end
+    @removed_packages = {}
+    in_block = false
+    stdout.split("\n").inject({}) do |removed, line|
+      if line =~ /^Removing:/ and not in_block
+        in_block = true
+        next
+      end
+
+      if line =~/^Transaction Summary/ and in_block
+        in_block = false
+        next
+      end
+
+      if in_block
+        if line =~ /^\s*(\S+)\s+\S+\s+(\S+)/
+          @removed_packages.store $1, $2 if $1 and $2
+        end
+      end
+    end
+    @removed_packages
+  end
+
+  def removed_packages
+    @removed_packages
+  end
+
+  def install(packages)
+    packages = Array packages
+    if osfamily == 'RedHat'
+      run "yum install -y #{packages.join ' '}"
+    elsif osfamily == 'Debian'
+      run "apt-get install -y #{packages.join ' '}"
+    else
+      raise "Unknown osfamily: #{osfamily}"
+    end
+  end
+
+  def install_removed_packages(key_packages = [])
+    if removed_packages.keys.length == 0 and key_packages.length > 0
+      install key_packages
+    elsif key_packages.length == 0 and removed_packages.keys.length > 0
+      install removed_packages.keys
+    elsif key_packages.length > 0 and removed_packages.keys.length > 0
+      to_install = key_packages.select do |kp|
+        removed_packages.key? kp
+      end
+      install to_install
+    end
+  end
+
   def uninstall_packages(packages)
     remove filter_installed(packages)
+  end
+
+  def reset_repos
+    if osfamily == 'RedHat'
+      run 'yum clean all'
+    elsif osfamily == 'Debian'
+      run 'apt-get clean'
+    else
+      raise "Unknown osfamily: #{osfamily}"
+    end
   end
 
 end

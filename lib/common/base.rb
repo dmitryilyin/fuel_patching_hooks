@@ -60,15 +60,23 @@ module Base
   # run the shell command with dry_run support
   # @param cmd [String] Command to run
   def run(cmd)
-    command = "#{dry_run ? 'echo' : ''} #{cmd} 2>&1"
-    system command
+    ENV['LANG'] = 'C'
+    log "Run: #{cmd}"
+    if dry_run
+      return ['', 0]
+    end
+    stdout = `#{cmd} 2>&1`
+    return_code = $?.exitstatus
+    puts stdout
+    puts "Return: #{return_code}"
+    [stdout, return_code]
   end
 
   # output a string
   # @param msg [String]
   def log(msg)
      begin
-       log_file = __FILE__ + '.log'
+       log_file = '/tmp/update.log'
        open(log_file, 'a') do |file|
          file.puts Time.now.to_s + ': ' + msg
        end
