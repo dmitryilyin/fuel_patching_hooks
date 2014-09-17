@@ -144,9 +144,9 @@ Remove        4 Package(s)                                                      
       @class.remove %w(iproute ntpdate)
     end
 
-    it 'uses yum apt-get install -y to install packages' do
+    it 'uses yum aptitude install -y to install packages' do
       @class.installed_packages_with_renew
-      @class.expects(:run).with 'apt-get install -y iproute ntpdate'
+      @class.expects(:run).with 'aptitude install -y iproute ntpdate'
       @class.install %w(iproute ntpdate)
     end
 

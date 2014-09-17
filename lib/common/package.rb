@@ -129,7 +129,7 @@ module Package
     if osfamily == 'RedHat'
       run "yum install -y #{packages.join ' '}"
     elsif osfamily == 'Debian'
-      run "apt-get install -y #{packages.join ' '}"
+      run "aptitude install -y #{packages.join ' '}"
     else
       raise "Unknown osfamily: #{osfamily}"
     end
