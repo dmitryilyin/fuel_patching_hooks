@@ -178,29 +178,29 @@ keystone (pid  109) is running...
 
   let(:debian_services_list) do
     {
-        'ntpd' => :unknown,
-        'neutron' => :unknown,
-        'cinder-volume' => :stopped,
-        'nginx' => :stopped,
-        'smbd' => :stopped,
-        'sshd' => :running,
-        'nova-api' => :running,
-        'apache2' => :running,
-        'keystone' => :running,
+        "apache2" => {:running=>true, :enabled=>true},
+        "cinder-volume" => {:running=>false, :enabled=>false},
+        "keystone" => {:running=>true, :enabled=>true},
+        "neutron" => {:running=>false, :enabled=>false},
+        "nginx" => {:running=>false, :enabled=>false},
+        "nova-api" => {:running=>true, :enabled=>true},
+        "ntpd" => {:running=>false, :enabled=>false},
+        "smbd" => {:running=>false, :enabled=>false},
+        "sshd" => {:running=>true, :enabled=>true},
     }
   end
 
   let(:redhat_services_list) do
     {
-        'ntpd' => :stopped,
-        'neutron' => :stopped,
-        'openstack-cinder-volume' => :stopped,
-        'nginx' => :stopped,
-        'smbd' => :stopped,
-        'sshd' => :running,
-        'openstack-nova-api' => :running,
-        'httpd' => :running,
-        'openstack-keystone' => :running,
+        "httpd" => {:running=>true, :enabled=>true},
+        "neutron" => {:running=>false, :enabled=>false},
+        "nginx" => {:running=>true, :enabled=>true},
+        "ntpd" => {:running=>false, :enabled=>false},
+        "openstack-cinder-volume" => {:running=>false, :enabled=>false},
+        "openstack-keystone" => {:running=>true, :enabled=>true},
+        "openstack-nova-api" => {:running=>true, :enabled=>true},
+        "smbd" => {:running=>false, :enabled=>false},
+        "sshd" => {:running=>true, :enabled=>true},
     }
   end
 
@@ -221,6 +221,10 @@ keystone (pid  109) is running...
       @class.stubs(:ps).returns(debian_ps)
       @class.stubs(:osfamily).returns 'Debian'
       @class.stubs(:services).returns debian_services
+      debian_services_list.each do |service_name, status|
+        @class.stubs(:service_is_enabled?).with(service_name).returns status[:enabled]
+        @class.stubs(:service_is_running?).with(service_name).returns status[:running]
+      end
     end
 
     it 'should find all services' do
@@ -229,7 +233,7 @@ keystone (pid  109) is running...
 
     it 'should find services by regexp' do
       @class.services_list_with_renew
-      expect(@class.services_by_regexp /nginx/).to eq({'nginx' => :stopped})
+      expect(@class.services_by_regexp(/nginx/).keys).to eq(['nginx'])
     end
 
     it 'should start correct services' do
@@ -243,7 +247,6 @@ keystone (pid  109) is running...
       @class.expects(:run).with 'service nova-api stop'
       @class.expects(:run).with 'service apache2 stop'
       @class.expects(:run).with 'service keystone stop'
-      @class.expects(:run).with 'service neutron stop'
       @class.services_list_with_renew
       @class.stop_services_by_regexp services_regexp
     end
@@ -254,6 +257,10 @@ keystone (pid  109) is running...
       @class.stubs(:ps).returns(redhat_ps)
       @class.stubs(:osfamily).returns 'RedHat'
       @class.stubs(:services).returns redhat_services
+      redhat_services_list.each do |service_name, status|
+        @class.stubs(:service_is_enabled?).with(service_name).returns status[:enabled]
+        @class.stubs(:service_is_running?).with(service_name).returns status[:running]
+      end
     end
 
     it 'should find services' do
@@ -262,7 +269,7 @@ keystone (pid  109) is running...
 
     it 'should find services by regexp' do
       @class.services_list_with_renew
-      expect(@class.services_by_regexp /nginx/).to eq({'nginx' => :stopped})
+      expect(@class.services_by_regexp(/nginx/).keys).to eq(['nginx'])
     end
 
     it 'should start correct services' do

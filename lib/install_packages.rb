@@ -1,2 +1,0 @@
-class InstallPackages
-end

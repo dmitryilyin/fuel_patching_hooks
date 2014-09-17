@@ -9,6 +9,11 @@ module Pacemaker
   @resources = nil
   @resources_structure = nil
 
+  def has_pacemaker?
+    out,code = run 'which cibadmin 2>&1 1>/dev/null'
+    code == 0
+  end
+
   def raw_cib
     @raw_cib = `cibadmin -Q`
     if @raw_cib == '' or not @raw_cib

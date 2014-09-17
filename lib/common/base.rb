@@ -4,6 +4,8 @@ require 'time'
 require 'yaml'
 
 module Base
+  LOG_FILE = '/var/log/patching.log'
+
   @osfamily = nil
   @dry_run = false
 
@@ -87,11 +89,62 @@ module Base
   # @param msg [String]
   def log(msg)
      begin
-       log_file = '/var/log/patching.log'
+       log_file = LOG_FILE
        open(log_file, 'a') do |file|
          file.puts Time.now.to_s + ': ' + msg
        end
      end
     puts msg
   end
+
+  def remove_log
+    begin
+      File.delete LOG_FILE if File.exists? LOG_FILE
+    rescue
+      false
+    end
+  end
+
+  def mysqldump(database, file)
+    database.gsub! %q('), %q(\')
+    file.gsub! %q('), %q(\')
+    command = %Q(mysqldump --default-character-set=utf8 --single-transaction '#{database}' | gzip > '#{file}')
+    out,code = run command
+    code == 0
+  end
+
+  def timestamp
+    Time.now.to_i.to_s
+  end
+
+  def drop_mysql_database(database)
+    database.gsub! %q('), %q(\')
+    command = %Q(drop database `#{database}`)
+    command = %Q(mysql -Be '#{command}')
+    out,code = run command
+    code == 0
+  end
+
+  def create_mysql_database(database)
+    database.gsub! %q('), %q(\')
+    command = %Q(create database `#{database}` default character set utf8)
+    command = %Q(mysql -Be '#{command}')
+    out,code = run command
+    code == 0
+  end
+
+  def mysql_query(query)
+    query.gsub! %q('), %q(\')
+    command = %Q(mysql -Be '#{query}')
+    run command
+  end
+
+  def mysql_database_exists?(database)
+    database.gsub! %q('), %q(\')
+    command = %Q(show create database `#{database}`)
+    command = %Q(mysql -Be '#{command}')
+    out,code = run command
+    code == 0
+  end
+
 end

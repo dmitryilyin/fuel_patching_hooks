@@ -3,6 +3,7 @@ require File.join(File.dirname(__FILE__), 'common/service')
 require File.join(File.dirname(__FILE__), 'common/process')
 require File.join(File.dirname(__FILE__), 'common/pacemaker')
 require File.join(File.dirname(__FILE__), 'common/package')
+require File.join(File.dirname(__FILE__), 'common/migration')
 
 class Update
   include Base
@@ -10,30 +11,27 @@ class Update
   include Process
   include Pacemaker
   include Package
+  include Migration
 
   def execute
     services = %r{nova|cinder|glance|keystone|neutron|sahara|murano|ceilometer|heat|swift|apache2|httpd}
-    #TODO make package lists for ubuntu and centos
+
     deb_packages = %w(
-heat-api
-heat-api-cfn
-heat-api-cloudwatch
-heat-common
-heat-engine
-python-heat
-python-heatclient
+        python-oslo.messaging python-oslo.config python-heat python-nova
+        python-routes python-routes1.13 python-neutron python-django-horizon
+        murano-common murano-api sahara sahara-dashboard python-ceilometer
+        python-swift python-cinder python-keystoneclient python-neutronclient
+        python-novaclient python-swiftclient python-troveclient
+        python-sqlalchemy python-testtools
     )
+
     rpm_packages = %w(
-murano-apps
-murano-api
-murano-dashboard
-openstack-dashboard
-openstack-heat-engine
-openstack-heat-api
-openstack-heat-api
-openstack-heat-api
-openstack-heat-common
-python-heatclient
+        python-oslo-messaging python-oslo-config openstack-heat-common
+        python-nova python-routes python-routes1.12 python-neutron
+        python-django-horizon murano-api sahara sahara-dashboard
+        python-ceilometer openstack-swift openstack-utils
+        python-glance python-glanceclient python-cinder
+        python-sqlalchemy python-testtools
     )
 
     if osfamily == 'RedHat'
@@ -45,28 +43,32 @@ python-heatclient
     end
 
     @dry_run = false
-    if is_ha?
+
+    ######
+
+    remove_log
+
+    if has_pacemaker?
       pcmk_status
       stop_or_ban_by_regexp services
-      # manage_cluster
+      manage_cluster
       pcmk_status
     end
+
     stop_services_by_regexp services
     kill_pids_by_regexp services
-    uninstall_packages packages
-    reset_repos
-    install_removed_packages packages
-    if is_ha?
+    reinstall_with_remove packages
+    recreate_murano_database
+
+    if has_pacemaker?
       pcmk_status
       start_or_unban_by_regexp services
-      # unmanage_cluster
+      unmanage_cluster
       cleanup_resources_by_regexp services
       pcmk_status
     end
-    start_services_by_regexp services
 
-    # TODO start non-ha services that are autostart? or run puppet? or start services that were stopped previously?
-    # finding a way to start services without Puppet will allow to patch with this script only
+    start_services_by_regexp services
   end
 
 end

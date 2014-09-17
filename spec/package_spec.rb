@@ -63,7 +63,7 @@ eos
 (Reading database ... 463883 files and directories currently installed.)
 Removing mc (3:4.8.11-1) ...
 Purging configuration files for mc (3:4.8.11-1) ...
-Removing mc-data (3:4.8.11-1) ...
+Removing mc-data ...
 eos
   end
 
@@ -72,7 +72,7 @@ eos
   end
 
   let(:deb_remove_list) do
-    {"mc-data"=>"3:4.8.11-1", "mc"=>"3:4.8.11-1"}
+    %w(mc mc-data)
   end
 
   let(:rpm_remove_out) do
@@ -95,7 +95,7 @@ Remove        4 Package(s)                                                      
   end
 
   let(:rpm_remove_list) do
-    {"htop"=>"1.0.1-2.el6", "tmux"=>"1.6-3.el6", "mc"=>"1:4.7.0.2-3.el6", "yum-utils"=>"1.1.30-17.el6_5"}
+    ["htop", "mc", "tmux", "yum-utils"]
   end
 
   ###########################
@@ -138,16 +138,27 @@ Remove        4 Package(s)                                                      
       @class.uninstall_packages packages_to_remove
     end
 
-    it 'uses apt-get remove -y to remove packages' do
+    it 'uses aptitude remove -y to remove packages' do
       @class.installed_packages_with_renew
-      @class.expects(:run).with 'apt-get remove -y iproute ntpdate'
+      @class.expects(:run).with 'aptitude remove -y iproute ntpdate'
+      @class.stubs(:dpkg_configure_all).returns true
       @class.remove %w(iproute ntpdate)
     end
 
-    it 'uses yum apt-get install -y to install packages' do
+    it 'uses aptitude install -y to install packages' do
       @class.installed_packages_with_renew
-      @class.expects(:run).with 'apt-get install -y iproute ntpdate'
+      @class.expects(:run).with 'aptitude install -y iproute ntpdate'
+      @class.stubs(:dpkg_configure_all).returns true
       @class.install %w(iproute ntpdate)
+    end
+
+    it 'runs dpkg --configure -a after install and remove' do
+      @class.installed_packages_with_renew
+      @class.stubs(:run).returns true
+      @class.stubs(:parse_deb_remove).returns true
+      @class.expects(:dpkg_configure_all).twice
+      @class.install %w(iproute ntpdate)
+      @class.remove %w(iproute ntpdate)
     end
 
     it 'parses deb remove output' do
@@ -169,17 +180,17 @@ Remove        4 Package(s)                                                      
         @class.install_removed_packages key_packages
       end
 
-      it 'installes all removed packages if no key packages present' do
+      it 'installs all removed packages' do
         @class.stubs(:removed_packages).returns deb_remove_list
-        @class.expects(:install).with deb_remove_list.keys
+        @class.expects(:install).with deb_remove_list
         @class.install_removed_packages
       end
 
-      it 'updates removing old packages first' do
-        @class.expects(:remove).with(%w(iproute mc ntpdate))
-        @class.stubs(:removed_packages).returns(deb_remove_list)
-        @class.expects(:install).with(%w(mc))
-        @class.update_removing_first packages_to_remove
+      it 'reinstalls removed packages' do
+        @class.expects(:remove).with(packages_to_remove - ['firefox'])
+        @class.stubs(:removed_packages).returns rpm_remove_list
+        @class.expects(:install).with rpm_remove_list
+        @class.reinstall_with_remove packages_to_remove
       end
     end
 
@@ -254,17 +265,17 @@ Remove        4 Package(s)                                                      
         @class.install_removed_packages key_packages
       end
 
-      it 'installes all removed packages if no key packages present' do
+      it 'installs all removed packages if no key packages present' do
         @class.stubs(:removed_packages).returns rpm_remove_list
-        @class.expects(:install).with rpm_remove_list.keys
+        @class.expects(:install).with rpm_remove_list
         @class.install_removed_packages
       end
 
-      it 'updates removing old packages first' do
-        @class.expects(:remove).with(%w(iproute mc ntpdate))
+      it 'reinstalls removed packages' do
+        @class.expects(:remove).with(packages_to_remove - ['firefox'])
         @class.stubs(:removed_packages).returns(rpm_remove_list)
-        @class.expects(:install).with(%w(mc))
-        @class.update_removing_first packages_to_remove
+        @class.expects(:install).with(rpm_remove_list)
+        @class.reinstall_with_remove packages_to_remove
       end
     end
 

@@ -1,4 +1,5 @@
 module Package
+  REMOVED_PACKAGES_LIST='/var/lib/removed_packages.txt'
 
   def get_rpm_packages
     `rpm -qa --queryformat '%{NAME}|%{VERSION}-%{RELEASE}\n'`
@@ -70,33 +71,40 @@ module Package
       stdout, return_code = run "yum erase -y #{packages.join ' '}"
       parse_rpm_remove stdout
     elsif osfamily == 'Debian'
-      stdout, return_code = run "apt-get remove -y #{packages.join ' '}"
+      stdout, return_code = run "aptitude remove -y #{packages.join ' '}"
       parse_deb_remove stdout
+      dpkg_configure_all
     else
       raise "Unknown osfamily: #{osfamily}"
     end
+    save_removed_packages_list
+    removed_packages
+  end
+
+  def dpkg_configure_all
+    run 'dpkg --configure -a'
   end
 
   def parse_deb_remove(stdout)
     if not stdout or stdout == ''
-      @removed_packages = {}
+      @removed_packages = []
       return @removed_packages
     end
-    @removed_packages = {}
+    @removed_packages = []
     stdout.split("\n").inject({}) do |removed, line|
-      if line =~ /^Removing\s+(\S+)\s+\((\S+?)\)\s+\.\.\./
-        @removed_packages.store $1, $2 if $1 and $2
+      if line =~ /^Removing\s+(\S+)/
+        @removed_packages << $1 if $1
       end
     end
-    @removed_packages
+    @removed_packages.sort!
   end
 
   def parse_rpm_remove(stdout)
     if not stdout or stdout == ''
-      @removed_packages = {}
+      @removed_packages = []
       return @removed_packages
     end
-    @removed_packages = {}
+    @removed_packages = []
     in_block = false
     stdout.split("\n").inject({}) do |removed, line|
       if line =~ /^Removing:/ and not in_block
@@ -110,17 +118,39 @@ module Package
       end
 
       if in_block
-        if line =~ /^\s*(\S+)\s+\S+\s+(\S+)/
-          @removed_packages.store $1, $2 if $1 and $2
+        if line =~ /^\s*(\S+)/
+          @removed_packages << $1 if $1
         end
       end
+    end
+    @removed_packages.sort!
+  end
+
+  def save_removed_packages_list
+    return unless removed_packages.any?
+    begin
+      File.open(REMOVED_PACKAGES_LIST, 'w') do |file|
+        file.write removed_packages.join "\n"
+      end
+    rescue
+      return false
+    end
+  end
+
+  def load_removed_pakages_list
+    @removed_packages = []
+    return @removed_packages unless File.exists? REMOVED_PACKAGES_LIST
+    begin
+      @removed_packages = File.read(REMOVED_PACKAGES_LIST).chomp.split("\n")
+    rescue
+      @removed_packages = []
     end
     @removed_packages
   end
 
   def removed_packages
-    @removed_packages = {} unless @removed_packages
-    @removed_packages
+    return @removed_packages if @removed_packages and @removed_packages.any?
+    load_removed_pakages_list
   end
 
   def install(packages)
@@ -129,20 +159,21 @@ module Package
     if osfamily == 'RedHat'
       run "yum install -y #{packages.join ' '}"
     elsif osfamily == 'Debian'
-      run "apt-get install -y #{packages.join ' '}"
+      run "aptitude install -y #{packages.join ' '}"
+      dpkg_configure_all
     else
       raise "Unknown osfamily: #{osfamily}"
     end
   end
 
   def install_removed_packages(key_packages = [])
-    if removed_packages.keys.length == 0 and key_packages.length > 0
+    if removed_packages.length == 0 and key_packages.length > 0
       install key_packages
-    elsif key_packages.length == 0 and removed_packages.keys.length > 0
-      install removed_packages.keys
-    elsif key_packages.length > 0 and removed_packages.keys.length > 0
+    elsif key_packages.length == 0 and removed_packages.length > 0
+      install removed_packages
+    elsif key_packages.length > 0 and removed_packages.length > 0
       to_install = key_packages.select do |kp|
-        removed_packages.key? kp
+        removed_packages.include? kp
       end
       install to_install
     end
@@ -164,9 +195,9 @@ module Package
     end
   end
 
-  def update_removing_first(packages)
+  def reinstall_with_remove(packages)
     uninstall_packages packages
-    install_removed_packages packages
+    install_removed_packages
   end
 
 end

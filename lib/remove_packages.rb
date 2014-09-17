@@ -1,2 +1,0 @@
-class RemovePackages
-end
